@@ -1,0 +1,505 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ojos Demoníacos</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    body {
+      background: #111;
+      overflow: hidden;
+      height: 100vh;
+      cursor: crosshair;
+      position: relative;
+      touch-action: none;
+    }
+    
+    .eye {
+      position: absolute;
+      width: 120px;
+      height: 120px;
+      background: yellow;
+      border-radius: 50%;
+      box-shadow: 
+        0 0 30px yellow inset,
+        0 0 10px yellow;
+      overflow: hidden;
+      transition: transform 0.2s ease;
+      transform-origin: center;
+      z-index: 2;
+      opacity: 0;
+      transition: opacity 1s, transform 0.3s;
+    }
+    
+    .eye::before {
+      content: "";
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      background: radial-gradient(circle at 35% 35%, rgba(255,255,0,0.8), rgba(255,255,0,0) 70%);
+      border-radius: 50%;
+    }
+    
+    .pupil {
+      position: absolute;
+      width: 45px;
+      height: 45px;
+      background: black;
+      border-radius: 50%;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      transition: transform 0.2s ease;
+      z-index: 3;
+    }
+    
+    .veins {
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      background-image: 
+        radial-gradient(circle, transparent 60%, rgba(138, 43, 226, 0.1) 100%),
+        url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><path d="M30,20 Q40,15 50,20 T70,25" stroke="%238a2be2" stroke-width="0.5" fill="none"/><path d="M25,40 Q35,35 45,40 T65,45" stroke="%238a2be2" stroke-width="0.5" fill="none"/><path d="M20,60 Q30,55 40,60 T60,65" stroke="%238a2be2" stroke-width="0.5" fill="none"/></svg>');
+      z-index: 1;
+      opacity: 0.6;
+    }
+    
+    @keyframes blink {
+      0%, 96%, 100% { height: 120px; }
+      97%, 99% { height: 20px; }
+    }
+    
+    @keyframes shake {
+      0% { transform: translateX(0); }
+      25% { transform: translateX(-10px); }
+      50% { transform: translateX(10px); }
+      75% { transform: translateX(-10px); }
+      100% { transform: translateX(0); }
+    }
+    
+    .blood {
+      position: absolute;
+      width: 200px;
+      height: 200px;
+      background: radial-gradient(circle, rgba(255,0,0,0) 0%, rgba(255,0,0,0.7) 70%);
+      border-radius: 50%;
+      transform: scale(0);
+      opacity: 0;
+      transition: transform 0.5s, opacity 0.5s;
+      pointer-events: none;
+      z-index: 5;
+    }
+    
+    .message {
+      position: absolute;
+      top: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      color: yellow;
+      font-family: 'Courier New', monospace;
+      font-size: 24px;
+      text-shadow: 0 0 10px yellow;
+      opacity: 0;
+      transition: opacity 3s;
+      text-align: center;
+      z-index: 10;
+    }
+    
+    .scream {
+      position: absolute;
+      color: white;
+      font-size: 30px;
+      font-weight: bold;
+      text-shadow: 0 0 5px red;
+      z-index: 10;
+      opacity: 0;
+      transition: opacity 0.5s, transform 0.5s;
+    }
+    
+    .eye-creepy {
+      background: red;
+      box-shadow: 0 0 30px red inset, 0 0 10px red;
+    }
+    
+    .shockwave {
+      position: absolute;
+      border-radius: 50%;
+      background: rgba(255, 255, 0, 0.2);
+      transform: scale(0);
+      pointer-events: none;
+      z-index: 1;
+    }
+    
+    #soundToggle {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      z-index: 100;
+      background: rgba(0,0,0,0.7);
+      color: white;
+      border: 1px solid yellow;
+      padding: 5px 10px;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <div class="message">NO DEBERÍAS HABER VENIDO AQUÍ...</div>
+  <button id="soundToggle">🔊 SONIDO ON</button>
+
+  <script>
+    // Variables globales
+    const eyes = [];
+    let eyeCount = 10;
+    let soundEnabled = true;
+    let audioContext;
+    let backgroundNoise;
+    let screamSound;
+    
+    // Inicializar
+    document.addEventListener('DOMContentLoaded', init);
+    
+    function init() {
+      setupAudio();
+      createInitialEyes();
+      setupEventListeners();
+      showMessage();
+    }
+    
+    function setupAudio() {
+      try {
+        audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        
+        // Crear sonido de fondo siniestro
+        backgroundNoise = audioContext.createOscillator();
+        const noiseGain = audioContext.createGain();
+        backgroundNoise.type = 'sawtooth';
+        backgroundNoise.frequency.value = 30;
+        noiseGain.gain.value = 0.02;
+        backgroundNoise.connect(noiseGain);
+        noiseGain.connect(audioContext.destination);
+        backgroundNoise.start();
+        
+        // Sonido de grito (se crea cuando sea necesario)
+      } catch (e) {
+        console.log("Error de audio:", e);
+        soundEnabled = false;
+        document.getElementById('soundToggle').textContent = "🔇 Audio no disponible";
+      }
+    }
+    
+    function createInitialEyes() {
+      for (let i = 0; i < eyeCount; i++) {
+        createEye();
+      }
+      
+      // Mostrar ojos gradualmente
+      setTimeout(() => {
+        eyes.forEach(eye => {
+          eye.element.style.opacity = '1';
+        });
+      }, 100);
+    }
+    
+    function createEye() {
+      const eye = document.createElement('div');
+      eye.className = 'eye';
+      
+      // Posicionar ojos en lugares estratégicos
+      if (eyes.length % 4 === 0) {
+        // Algunos ojos en los bordes
+        eye.style.left = (Math.random() > 0.5 ? 20 : window.innerWidth - 140) + 'px';
+        eye.style.top = (Math.random() * (window.innerHeight - 140) + 20) + 'px';
+      } else {
+        eye.style.left = (Math.random() * (window.innerWidth - 120) + 20) + 'px';
+        eye.style.top = (Math.random() * (window.innerHeight - 120) + 20) + 'px';
+      }
+      
+      // Añadir venas moradas
+      const veins = document.createElement('div');
+      veins.className = 'veins';
+      eye.appendChild(veins);
+      
+      // Añadir pupila
+      const pupil = document.createElement('div');
+      pupil.className = 'pupil';
+      eye.appendChild(pupil);
+      
+      // Algunos ojos parpadean
+      if (Math.random() > 0.6) {
+        eye.style.animation = 'blink 6s infinite';
+      }
+      
+      document.body.appendChild(eye);
+      eyes.push({
+        element: eye,
+        pupil: pupil,
+        isHurt: false
+      });
+      
+      return eye;
+    }
+    
+    function setupEventListeners() {
+      // Seguir cursor con las pupilas
+      document.addEventListener('mousemove', followCursor);
+      
+      // Click en ojos
+      document.addEventListener('click', handleClick);
+      
+      // Toggle sonido
+      document.getElementById('soundToggle').addEventListener('click', toggleSound);
+    }
+    
+    function followCursor(e) {
+      const mx = e.clientX;
+      const my = e.clientY;
+      
+      eyes.forEach((eye, i) => {
+        if (eye.isHurt) return;
+        
+        setTimeout(() => {
+          const rect = eye.element.getBoundingClientRect();
+          const cx = rect.left + rect.width/2;
+          const cy = rect.top + rect.height/2;
+          const dx = mx - cx;
+          const dy = my - cy;
+          const dist = Math.sqrt(dx*dx + dy*dy);
+          const angle = Math.atan2(dy, dx);
+          
+          // Mover pupila
+          const maxDist = 30;
+          const moveX = Math.cos(angle) * Math.min(dist/8, maxDist);
+          const moveY = Math.sin(angle) * Math.min(dist/8, maxDist);
+          
+          eye.pupil.style.transform = `translate(calc(-50% + ${moveX}px), calc(-50% + ${moveY}px))`;
+          
+          // Inclinación sutil del ojo
+          eye.element.style.transform = `rotate(${angle/5}rad)`;
+        }, i * 30);
+      });
+    }
+    
+    function handleClick(e) {
+      let clickedEye = false;
+      
+      // Verificar si se hizo clic en un ojo
+      eyes.forEach(eye => {
+        const rect = eye.element.getBoundingClientRect();
+        const distance = Math.sqrt(
+          Math.pow(e.clientX - (rect.left + rect.width/2), 2) + 
+          Math.pow(e.y - (rect.top + rect.height/2), 2)
+        );
+        
+        if (distance < rect.width/2 && !eye.isHurt) {
+          clickedEye = true;
+          hurtEye(eye, e.clientX, e.clientY);
+        }
+      });
+      
+      // Si no se hizo clic en un ojo, agregar más ojos
+      if (!clickedEye) {
+        spawnMoreEyes(e.clientX, e.clientY);
+      }
+    }
+    
+    function hurtEye(eye, x, y) {
+      eye.isHurt = true;
+      
+      // Efecto visual
+      eye.element.classList.add('eye-creepy');
+      eye.element.style.animation = 'shake 0.5s';
+      
+      // Efecto de sangre
+      createBloodEffect(x, y);
+      
+      // Grito de dolor
+      createScreamText(x, y);
+      playScreamSound();
+      
+      // Restaurar ojo después de un tiempo
+      setTimeout(() => {
+        eye.element.classList.remove('eye-creepy');
+        eye.element.style.animation = '';
+        eye.isHurt = false;
+      }, 3000);
+    }
+    
+    function createBloodEffect(x, y) {
+      const blood = document.createElement('div');
+      blood.className = 'blood';
+      blood.style.left = (x - 100) + 'px';
+      blood.style.top = (y - 100) + 'px';
+      document.body.appendChild(blood);
+      
+      setTimeout(() => {
+        blood.style.transform = 'scale(1)';
+        blood.style.opacity = '0.8';
+      }, 10);
+      
+      setTimeout(() => {
+        blood.style.opacity = '0';
+        setTimeout(() => blood.remove(), 500);
+      }, 2000);
+    }
+    
+    function createScreamText(x, y) {
+      const scream = document.createElement('div');
+      scream.className = 'scream';
+      scream.textContent = '¡ARGH!';
+      scream.style.left = (x - 20) + 'px';
+      scream.style.top = (y - 50) + 'px';
+      document.body.appendChild(scream);
+      
+      setTimeout(() => {
+        scream.style.opacity = '1';
+        scream.style.transform = 'translateY(-30px)';
+      }, 50);
+      
+      setTimeout(() => {
+        scream.style.opacity = '0';
+        setTimeout(() => scream.remove(), 500);
+      }, 1000);
+    }
+    
+    function playScreamSound() {
+      if (!soundEnabled) return;
+      
+      try {
+        // Usamos el oscilador para crear un grito agudo
+        const oscillator = audioContext.createOscillator();
+        const gainNode = audioContext.createGain();
+        
+        oscillator.type = 'sawtooth';
+        oscillator.frequency.value = 100;
+        gainNode.gain.value = 0.5;
+        
+        // Conectar nodos
+        oscillator.connect(gainNode);
+        gainNode.connect(audioContext.destination);
+        
+        // Modulación de frecuencia para el efecto de grito
+        oscillator.frequency.exponentialRampToValueAtTime(
+          1200, 
+          audioContext.currentTime + 0.2
+        );
+        
+        // Desvanecer el sonido
+        gainNode.gain.exponentialRampToValueAtTime(
+          0.01, 
+          audioContext.currentTime + 0.5
+        );
+        
+        oscillator.start();
+        setTimeout(() => oscillator.stop(), 500);
+      } catch (e) {
+        console.log("Error en sonido de grito:", e);
+      }
+    }
+    
+    function spawnMoreEyes(x, y) {
+      // Efecto de shockwave
+      createShockwave(x, y);
+      
+      // Sonido de multiplicación
+      playMultiplySound();
+      
+      // Crear 3 nuevos ojos alrededor del punto de clic
+      for (let i = 0; i < 3; i++) {
+        const angle = Math.random() * Math.PI * 2;
+        const distance = 50 + Math.random() * 100;
+        const newX = x + Math.cos(angle) * distance;
+        const newY = y + Math.sin(angle) * distance;
+        
+        // Asegurarse de que estén dentro de la pantalla
+        const clampedX = Math.max(60, Math.min(window.innerWidth - 60, newX));
+        const clampedY = Math.max(60, Math.min(window.innerHeight - 60, newY));
+        
+        const eye = createEye();
+        eye.style.left = (clampedX - 60) + 'px';
+        eye.style.top = (clampedY - 60) + 'px';
+        eye.style.opacity = '1';
+        
+        // Efecto de aparición
+        eye.style.transform = 'scale(0)';
+        setTimeout(() => {
+          eye.style.transform = 'scale(1)';
+        }, 10);
+      }
+    }
+    
+    function createShockwave(x, y) {
+      const wave = document.createElement('div');
+      wave.className = 'shockwave';
+      wave.style.left = (x - 50) + 'px';
+      wave.style.top = (y - 50) + 'px';
+      wave.style.width = '100px';
+      wave.style.height = '100px';
+      document.body.appendChild(wave);
+      
+      setTimeout(() => {
+        wave.style.transition = 'transform 1s, opacity 1s';
+        wave.style.transform = 'scale(10)';
+        wave.style.opacity = '0';
+      }, 10);
+      
+      setTimeout(() => wave.remove(), 1100);
+    }
+    
+    function playMultiplySound() {
+      if (!soundEnabled) return;
+      
+      try {
+        const osc = audioContext.createOscillator();
+        const gain = audioContext.createGain();
+        
+        osc.type = 'sine';
+        osc.frequency.value = 80;
+        gain.gain.value = 0.3;
+        
+        osc.connect(gain);
+        gain.connect(audioContext.destination);
+        
+        // Modulación descendente
+        osc.frequency.exponentialRampToValueAtTime(
+          20, 
+          audioContext.currentTime + 0.5
+        );
+        
+        osc.start();
+        setTimeout(() => {
+          osc.stop();
+        }, 500);
+      } catch (e) {
+        console.log("Error en sonido de multiplicación:", e);
+      }
+    }
+    
+    function showMessage() {
+      setTimeout(() => {
+        document.querySelector('.message').style.opacity = '1';
+      }, 3000);
+    }
+    
+    function toggleSound() {
+      soundEnabled = !soundEnabled;
+      const btn = document.getElementById('soundToggle');
+      
+      if (soundEnabled) {
+        btn.textContent = "🔊 SONIDO ON";
+        if (audioContext?.state === 'suspended') {
+          audioContext.resume();
+        }
+      } else {
+        btn.textContent = "🔇 SONIDO OFF";
+      }
+    }
+  </script>
+</body>
+</html>
